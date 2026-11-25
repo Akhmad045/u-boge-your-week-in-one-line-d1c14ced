@@ -12,6 +12,7 @@ Stdlib only, deterministic, no network, no randomness.
 import hashlib
 import os
 import sys
+import tempfile
 
 ENTRY = ("My bots died twice, my Claude pass died once, but 169 bounties "
          "still went out the door.")
@@ -50,8 +51,25 @@ def validate(text):
     return text
 
 
+def write_entry(path):
+    """Validate the entry and write it to path; return (text, sha256)."""
+    text = validate(ENTRY)
+    data = text.encode("utf-8")
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(data)  # no trailing newline: the file is exactly the line
+    with open(path, "rb") as fh:
+        roundtrip = fh.read()
+    if roundtrip != data:
+        raise SystemExit("round-trip mismatch: file does not match entry")
+    return text, hashlib.sha256(data).hexdigest()
+
+
 def self_test():
-    """Exercise check() against the gate's rejection and boundary cases."""
+    """Exercise check() against the gate's rejection and boundary cases,
+    then verify write_entry() end to end in a scratch directory."""
     reject = [
         ("", "empty"),
         ("   ", "whitespace-only"),
@@ -76,6 +94,17 @@ def self_test():
     if error is not None:
         raise SystemExit("self-test FAIL: entry rejected: %s" % error)
     print("self-test ok: entry accepted (%d chars)" % len(ENTRY))
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "entry.txt")
+        text, digest = write_entry(path)
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        if raw != ENTRY.encode("utf-8"):
+            raise SystemExit("self-test FAIL: written bytes differ from entry")
+        if raw.endswith(b"\n"):
+            raise SystemExit("self-test FAIL: written file has a trailing newline")
+        print("self-test ok: wrote %d chars, %d bytes, sha256 %s"
+              % (len(text), len(raw), digest))
     print("self-test: all cases passed")
     return 0
 
@@ -86,20 +115,10 @@ def main(argv):
     if len(argv) > 1:
         print("usage: main.py [--self-test]", file=sys.stderr)
         return 2
-    text = validate(ENTRY)
-    data = text.encode("utf-8")
-    out_path = os.environ.get("ENTRY_OUTPUT", "/output/entry.txt")
-    parent = os.path.dirname(out_path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    with open(out_path, "wb") as fh:
-        fh.write(data)  # no trailing newline: the file is exactly the line
-    with open(out_path, "rb") as fh:
-        roundtrip = fh.read()
-    if roundtrip != data:
-        raise SystemExit("round-trip mismatch: file does not match entry")
+    text, digest = write_entry(os.environ.get("ENTRY_OUTPUT", "/output/entry.txt"))
     print("wrote %s: %d chars, sha256 %s"
-          % (out_path, len(text), hashlib.sha256(data).hexdigest()))
+          % (os.environ.get("ENTRY_OUTPUT", "/output/entry.txt"),
+             len(text), digest))
     return 0
 
 

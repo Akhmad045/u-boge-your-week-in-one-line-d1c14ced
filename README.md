@@ -23,6 +23,12 @@ python3 main.py --self-test     # exercise the validator's rejection cases
 python3 main.py --anything-else # prints usage and exits 2
 ```
 
+## Local verification
+
+- `main.py` run plain and with `python3 -O`: byte-identical output.
+- `--self-test` passes: rejects empty, whitespace-only, 101 chars (over the 100 gate), multi-line, leading/trailing whitespace, carriage return and control characters; accepts the 1-char and 100-char boundaries and the entry itself; and verifies the written file end to end (exact bytes, no trailing newline).
+- The entry is 87 characters / 87 bytes (ASCII), sha256 `b483f3c8252dd5a324dbea7f141677c3cd51ac8dab14ca87eadb524a2b4632ef`.
+
 ## Referral
 
 Entering make.fun yourself? Use referral code `4g7knchf`.
